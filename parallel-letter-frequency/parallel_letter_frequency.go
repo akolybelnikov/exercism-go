@@ -8,12 +8,6 @@ import (
 // FreqMap records the frequency of each rune in a given text.
 type FreqMap map[rune]int
 
-type safeFrequency struct {
-	mu sync.Mutex
-	fm FreqMap
-	wg sync.WaitGroup
-}
-
 // Frequency counts the frequency of each rune in a given text and returns this
 // data as a FreqMap.
 func Frequency(s string) FreqMap {
@@ -27,20 +21,28 @@ func Frequency(s string) FreqMap {
 // ConcurrentFrequency counts the frequency of each rune in each text in a list of texts concurrently
 // and returns this data as a FreqMap.
 func ConcurrentFrequency(texts []string) FreqMap {
-	sf := safeFrequency{fm: make(FreqMap)}
-	for _, t := range texts {
-		sf.wg.Add(1)
-		go sf.concFrequency(t)
-	}
-	sf.wg.Wait()
-	return sf.fm
-}
+	mapStream := make(chan FreqMap, len(texts))
+	var wg sync.WaitGroup
+	wg.Add(len(texts))
 
-func (f *safeFrequency) concFrequency(s string) {
-	defer f.wg.Done()
-	for _, r := range s {
-		f.mu.Lock()
-		f.fm[r]++
-		f.mu.Unlock()
+	for _, t := range texts {
+		go func(text string) {
+			m := Frequency(text)
+			mapStream <- m
+			wg.Done()
+		}(t)
 	}
+
+	go func() {
+		wg.Wait()
+		close(mapStream)
+	}()
+
+	fm := make(FreqMap)
+	for m := range mapStream {
+		for k, v := range m {
+			fm[k] += v
+		}
+	}
+	return fm
 }
