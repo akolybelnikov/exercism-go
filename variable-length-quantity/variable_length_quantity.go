@@ -117,6 +117,8 @@ func DecodeVarint(input []byte) (output []uint32, err error) {
 	count := 0
 	var words [][]byte
 	var word []byte
+	// parse the input slice into potential uint32 byte slices based on the leftmost bit
+	// a 0 last bit means it's the last chunk of the encoding
 	for i := 0; i < len(input); i++ {
 		if count == 0 {
 			word = []byte{}
@@ -129,7 +131,7 @@ func DecodeVarint(input []byte) (output []uint32, err error) {
 			count = 0
 		}
 	}
-
+	// if we don't reach a 0 as leftmost bit, the sequence is incomplete and cannot be decoded
 	if count != 0 {
 		return []uint32{}, errors.New("incomplete sequence")
 	}
@@ -146,23 +148,34 @@ func decode(bs []byte) uint32 {
 	var self byte
 	res := make([]byte, 4)
 	curr := 0
+	// iterate over the bytes starting from the last one
 	for i := l - 1; i >= 0; i-- {
+		// take the byte and clear the leftmost bit which was used to index the sequence
 		self = bs[i]
 		self = clearBit(self, BITS-1)
+		// while encoding we shift the bits to the left increasingly
+		// now we need to identify where the native bits of a byte end
 		pos := BITS - (l - 1 - i)
+		// and shift the bits to the right by this amount
 		self = self >> (BITS - pos)
+		// in all bytes but the leftmost we clear all the non-native bits
 		if i > 0 {
 			for j := uint(pos); j <= BITS-1; j++ {
 				self = clearBit(self, j)
 			}
 		}
+		// for all the bytes but the leftmost one we recover the native bits
+		// by taking the next byte on the left side and rotating it's bits left
 		if i > 0 {
 			self += bs[i-1] << (pos - 1)
 		}
+		// we reverse-append the bytes except the ones that were created to accommodate
+		// the encodings longer than 32 bits
 		if curr < 4 {
 			res[curr] = self
 			curr++
 		}
 	}
+	// cast the resulting bytes to uint32
 	return binary.LittleEndian.Uint32(res)
 }
