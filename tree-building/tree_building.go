@@ -24,18 +24,16 @@ func Build(records []Record) (*Node, error) {
 		return nil, nil
 	}
 
-	if len(records) == 1 {
-		if records[0].ID == 0 {
-			return &Node{ID: 0}, nil
-		}
-		return nil, errors.New("no root node")
-	}
-
 	// maintain a data structure keeping track of children of the nodes still not found in records
 	var childrenMap = make(map[int][]*Node)
 
 	// keep track of the discovered nodes
 	var nodes = make(map[int]*Node)
+
+	// sort the records
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].ID < records[j].ID
+	})
 
 	for _, record := range records {
 		node, err := newNode(record)
@@ -49,7 +47,7 @@ func Build(records []Record) (*Node, error) {
 		// check if some previously found nodes declared the current node as parent
 		if children, exist := childrenMap[node.ID]; exist {
 			for _, child := range children {
-				node.insert(child)
+				node.Children = append(node.Children, child)
 			}
 			delete(childrenMap, node.ID)
 		}
@@ -58,7 +56,7 @@ func Build(records []Record) (*Node, error) {
 		// check the current node parent record for not-root nodes
 		if node.ID != 0 {
 			if parent, exists := nodes[record.Parent]; exists {
-				parent.insert(node)
+				parent.Children = append(parent.Children, node)
 			} else {
 				// if it hasn't been registered yet, make sure we keep the track of children
 				if children, exist := childrenMap[record.Parent]; exist {
@@ -109,6 +107,8 @@ func isContinuous(nodes *map[int]*Node) bool {
 	return cont
 }
 
+// may be used in a non-sorted records implementation
+// not necessary if records are sorted
 func (n *Node) insert(child *Node) {
 	index := sort.Search(len(n.Children), func(i int) bool {
 		return n.Children[i].ID > child.ID
