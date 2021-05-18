@@ -27,9 +27,8 @@ func Build(records []Record) (*Node, error) {
 	if len(records) == 1 {
 		if records[0].ID == 0 {
 			return &Node{ID: 0}, nil
-		} else {
-			return nil, errors.New("no root node")
 		}
+		return nil, errors.New("no root node")
 	}
 
 	// maintain a data structure keeping track of children of the nodes still not found in records
@@ -46,17 +45,16 @@ func Build(records []Record) (*Node, error) {
 		// check for duplicates
 		if _, nodeExists := nodes[node.ID]; nodeExists {
 			return nil, errors.New("duplicate node")
-		} else {
-			// check if some previously found nodes declared the current node as parent
-			if children, exist := childrenMap[node.ID]; exist {
-				for _, child := range children {
-					node.insert(child)
-				}
-				delete(childrenMap, node.ID)
-			}
-			// register the node
-			nodes[node.ID] = node
 		}
+		// check if some previously found nodes declared the current node as parent
+		if children, exist := childrenMap[node.ID]; exist {
+			for _, child := range children {
+				node.insert(child)
+			}
+			delete(childrenMap, node.ID)
+		}
+		// register the node
+		nodes[node.ID] = node
 		// check the current node parent record for not-root nodes
 		if node.ID != 0 {
 			if parent, exists := nodes[record.Parent]; exists {
@@ -76,11 +74,11 @@ func Build(records []Record) (*Node, error) {
 		return nil, errors.New("non-continuous")
 	}
 
-	if root, ok := nodes[0]; !ok {
-		return nil, errors.New("no root node")
-	} else {
+	if root, ok := nodes[0]; ok {
 		return root, nil
 	}
+
+	return nil, errors.New("no root node")
 }
 
 func newNode(rec Record) (*Node, error) {
