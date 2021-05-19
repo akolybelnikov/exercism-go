@@ -2,7 +2,7 @@
 package tree
 
 import (
-	"errors"
+	"fmt"
 	"sort"
 )
 
@@ -20,10 +20,6 @@ type Node struct {
 
 // Build implements the tree building logic for unsorted set of records
 func Build(records []Record) (*Node, error) {
-	if len(records) == 0 {
-		return nil, nil
-	}
-
 	// sort the records
 	sort.Slice(records, func(i, j int) bool {
 		return records[i].ID < records[j].ID
@@ -32,29 +28,18 @@ func Build(records []Record) (*Node, error) {
 	// keep track of the discovered nodes
 	var nodes = make(map[int]*Node)
 
-	for i, record := range records {
-		if (record.ID != i) || (record.ID == 0 && record.Parent != 0) || (record.ID < record.Parent) || (record.ID != 0 && record.ID == record.Parent) {
-			return nil, errors.New("invalid record")
+	for i, r := range records {
+		if r.ID != i || r.Parent > r.ID || r.ID > 0 && r.ID == r.Parent {
+			return nil, fmt.Errorf("not in sequence or has bad parent: %v", r)
 		}
-		node := &Node{ID: record.ID}
-
-		// check for duplicates
-		if _, nodeExists := nodes[node.ID]; nodeExists {
-			return nil, errors.New("duplicate node")
-		}
-
-		// register the node
-		nodes[node.ID] = node
+		// register the record as a node
+		nodes[r.ID] = &Node{ID: r.ID}
 
 		// append the node to the parent's children
-		if record.ID != 0 {
-			nodes[record.Parent].Children = append(nodes[record.Parent].Children, node)
+		if r.ID != 0 {
+			nodes[r.Parent].Children = append(nodes[r.Parent].Children, nodes[r.ID])
 		}
 	}
 
-	if root, ok := nodes[0]; ok {
-		return root, nil
-	}
-
-	return nil, errors.New("no root node")
+	return nodes[0], nil
 }
